@@ -1,9 +1,11 @@
-﻿using Mapster;
+﻿using FluentValidation;
+using Mapster;
 using MapsterMapper;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MinimalApiApplication.Context;
 using MinimalApiApplication.Entities;
+using System.ComponentModel.DataAnnotations;
 namespace MinimalApiApplication.EndpointBuilder;
 public class EndpointBuilder<TEntity> where TEntity : BaseEntity
 {
@@ -17,10 +19,14 @@ public class EndpointBuilder<TEntity> where TEntity : BaseEntity
 
     public EndpointBuilder<TEntity> WithCreate<TRequest, TResponse>()
     {
-        _routeGroup.MapPost("/", async (ApplicationDbContext dbContext, [FromBody] TRequest requestEntity, [FromServices] IMapper mapper) =>
+        _routeGroup.MapPost("/", async (ApplicationDbContext dbContext, [FromBody] TRequest requestEntity, [FromServices] IValidator<TRequest> validator, [FromServices] IMapper mapper) =>
         {
+            var validationResult = validator.Validate(requestEntity);
+            if (!validationResult.IsValid)
+                return Results.ValidationProblem(validationResult.ToDictionary()); 
+
             var entity = mapper.Map<TEntity>(requestEntity);
-            dbContext.Add(entity); // required validation 
+            dbContext.Add(entity); 
             await dbContext.SaveChangesAsync();
             var responseEntity = mapper.Map<TResponse>(entity);
             return Results.Ok(responseEntity);
@@ -30,10 +36,13 @@ public class EndpointBuilder<TEntity> where TEntity : BaseEntity
 
     public EndpointBuilder<TEntity> WithUpdate<TRequest>()
     {
-        _routeGroup.MapPut("/{id}", async ([FromServices] ApplicationDbContext dbContext, [FromRoute] int id, [FromBody] TRequest requestDto,[FromServices] IMapper mapper) =>
+        _routeGroup.MapPut("/{id}", async ([FromServices] ApplicationDbContext dbContext, [FromServices] IValidator<TRequest> validator, [FromRoute] int id, [FromBody] TRequest requestDto,[FromServices] IMapper mapper) =>
         {
-            var request = mapper.Map<TEntity>(requestDto);
+            var validationResult = validator.Validate(requestDto);
+            if(!validationResult.IsValid)
+                return Results.ValidationProblem(validationResult.ToDictionary());
 
+            var request = mapper.Map<TEntity>(requestDto);
             var dbSet = dbContext.Set<TEntity>();
             var entity = await dbSet.FirstOrDefaultAsync(e => e.Id == id);
             if (entity != null)

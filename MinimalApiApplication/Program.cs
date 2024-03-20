@@ -1,3 +1,4 @@
+using FluentValidation;
 using Mapster;
 using Microsoft.EntityFrameworkCore;
 using MinimalApiApplication.Context;
@@ -9,6 +10,8 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<ApplicationDbContext>(opt => opt.UseInMemoryDatabase(databaseName: "MinimalApiDb"));
 builder.Services.AddMapster();
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
